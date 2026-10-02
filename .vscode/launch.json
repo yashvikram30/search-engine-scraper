@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Run Scraper API Server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.py",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/.venv/lib/python3.14/site-packages:${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Python: Run Trial Batch",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ddg_scraper.trial",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/.venv/lib/python3.14/site-packages:${workspaceFolder}",
+        "DDG_METHOD": "POST"
+      }
+    },
+    {
+      "name": "Python: Run Pytest",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-v"],
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/.venv/lib/python3.14/site-packages:${workspaceFolder}"
+      }
+    }
+  ]
+}

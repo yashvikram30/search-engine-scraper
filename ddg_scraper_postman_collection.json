@@ -1,0 +1,448 @@
+{
+  "info": {
+    "name": "Search Scraper API (DuckDuckGo & Brave)",
+    "description": "Comprehensive Postman Collection to test DuckDuckGo and Brave Search via the local Scraper API server as well as directly against search engine endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "pages",
+      "value": "3",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. DuckDuckGo Scraper (Local API)",
+      "item": [
+        {
+          "name": "Local DDG - GET Multi-Page Search (x Pages)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=machine+learning&pages={{pages}}&region=us-en&engine=ddg&method=POST",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "machine learning",
+                  "description": "Search query terms"
+                },
+                {
+                  "key": "pages",
+                  "value": "{{pages}}",
+                  "description": "Number of pages to scrape (e.g. 1, 2, 3, 5)"
+                },
+                {
+                  "key": "region",
+                  "value": "us-en",
+                  "description": "Region / Language code (e.g. us-en, uk-en, de-de)"
+                },
+                {
+                  "key": "engine",
+                  "value": "ddg",
+                  "description": "Engine to use: 'ddg' or 'brave'"
+                },
+                {
+                  "key": "method",
+                  "value": "POST",
+                  "description": "DDG request method (POST recommended to avoid bot anomaly page)"
+                }
+              ]
+            },
+            "description": "Scrapes 'x' pages sequentially from DuckDuckGo, automatically chaining vqd tokens and returning contiguous positions (1..N)."
+          }
+        },
+        {
+          "name": "Local DDG - POST Multi-Page Search (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"python asyncio tutorial\",\n  \"pages\": 3,\n  \"region\": \"us-en\",\n  \"engine\": \"ddg\",\n  \"method\": \"POST\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"]
+            },
+            "description": "Sends search query, target page count, and engine in JSON body. Returns unified JSON results."
+          }
+        },
+        {
+          "name": "Local DDG - Single Page Search (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=fastapi+tutorial&pages=1&region=us-en&engine=ddg&method=POST",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "fastapi tutorial"
+                },
+                {
+                  "key": "pages",
+                  "value": "1"
+                },
+                {
+                  "key": "region",
+                  "value": "us-en"
+                },
+                {
+                  "key": "engine",
+                  "value": "ddg"
+                },
+                {
+                  "key": "method",
+                  "value": "POST"
+                }
+              ]
+            },
+            "description": "Standard single-page DDG search returning top results."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Brave Search Scraper (Local API)",
+      "item": [
+        {
+          "name": "Local Brave - GET Multi-Page Search (x Pages)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=rust+concurrency&pages={{pages}}&engine=brave",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust concurrency",
+                  "description": "Search query terms"
+                },
+                {
+                  "key": "pages",
+                  "value": "{{pages}}",
+                  "description": "Number of pages to scrape (e.g. 1, 2, 3)"
+                },
+                {
+                  "key": "engine",
+                  "value": "brave",
+                  "description": "Engine to use: 'brave'"
+                }
+              ]
+            },
+            "description": "Scrapes 'x' pages sequentially from Brave Search using offset pagination (offset 0, 1, 2...)."
+          }
+        },
+        {
+          "name": "Local Brave - POST Multi-Page Search (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"golang microservices architecture\",\n  \"pages\": 3,\n  \"engine\": \"brave\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"]
+            },
+            "description": "Sends search query and target page count to Brave Engine via JSON POST payload."
+          }
+        },
+        {
+          "name": "Local Brave - Single Page Search (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=docker+containers&pages=1&engine=brave",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "docker containers"
+                },
+                {
+                  "key": "pages",
+                  "value": "1"
+                },
+                {
+                  "key": "engine",
+                  "value": "brave"
+                }
+              ]
+            },
+            "description": "Single-page query against Brave Search engine returning structured results."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Server Health & Monitoring",
+      "item": [
+        {
+          "name": "Health Check (Cooling Proxy Count)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Checks server health status and reports the number of proxies currently cooling down."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Direct Search Engine Requests",
+      "item": [
+        {
+          "name": "Direct DDG - POST (Returns HTTP 200 Real Results)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+              },
+              {
+                "key": "Accept",
+                "value": "text/html,application/xhtml+xml"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en-US,en;q=0.9"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Sec-Fetch-Dest",
+                "value": "document"
+              },
+              {
+                "key": "Sec-Fetch-Mode",
+                "value": "navigate"
+              },
+              {
+                "key": "Sec-Fetch-Site",
+                "value": "none"
+              },
+              {
+                "key": "Sec-Fetch-User",
+                "value": "?1"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "q",
+                  "value": "python programming language",
+                  "type": "text"
+                },
+                {
+                  "key": "b",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "kl",
+                  "value": "us-en",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://html.duckduckgo.com/html/",
+              "protocol": "https",
+              "host": ["html", "duckduckgo", "com"],
+              "path": ["html", ""]
+            },
+            "description": "Direct POST to DuckDuckGo HTML endpoint without proxy or local server."
+          }
+        },
+        {
+          "name": "Direct DDG - GET (Triggers HTTP 202 Challenge)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+              },
+              {
+                "key": "Accept",
+                "value": "text/html,application/xhtml+xml"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en-US,en;q=0.9"
+              },
+              {
+                "key": "Sec-Fetch-Dest",
+                "value": "document"
+              },
+              {
+                "key": "Sec-Fetch-Mode",
+                "value": "navigate"
+              },
+              {
+                "key": "Sec-Fetch-Site",
+                "value": "none"
+              },
+              {
+                "key": "Sec-Fetch-User",
+                "value": "?1"
+              }
+            ],
+            "url": {
+              "raw": "https://html.duckduckgo.com/html/?q=python",
+              "protocol": "https",
+              "host": ["html", "duckduckgo", "com"],
+              "path": ["html", ""],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "python"
+                }
+              ]
+            },
+            "description": "Direct GET request to DuckDuckGo (demonstrates bot anomaly / HTTP 202 challenge page on non-residential IPs)."
+          }
+        },
+        {
+          "name": "Direct Brave - GET Search (Page 1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+              },
+              {
+                "key": "Accept",
+                "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en-US,en;q=0.9"
+              },
+              {
+                "key": "Sec-Fetch-Dest",
+                "value": "document"
+              },
+              {
+                "key": "Sec-Fetch-Mode",
+                "value": "navigate"
+              },
+              {
+                "key": "Sec-Fetch-Site",
+                "value": "none"
+              },
+              {
+                "key": "Sec-Fetch-User",
+                "value": "?1"
+              }
+            ],
+            "url": {
+              "raw": "https://search.brave.com/search?q=rust+programming",
+              "protocol": "https",
+              "host": ["search", "brave", "com"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust programming"
+                }
+              ]
+            },
+            "description": "Direct GET query to Brave Search (Page 1, offset 0)."
+          }
+        },
+        {
+          "name": "Direct Brave - GET Pagination Offset (Page 2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+              },
+              {
+                "key": "Accept",
+                "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en-US,en;q=0.9"
+              },
+              {
+                "key": "Sec-Fetch-Dest",
+                "value": "document"
+              },
+              {
+                "key": "Sec-Fetch-Mode",
+                "value": "navigate"
+              },
+              {
+                "key": "Sec-Fetch-Site",
+                "value": "none"
+              },
+              {
+                "key": "Sec-Fetch-User",
+                "value": "?1"
+              }
+            ],
+            "url": {
+              "raw": "https://search.brave.com/search?q=rust+programming&offset=1",
+              "protocol": "https",
+              "host": ["search", "brave", "com"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust programming"
+                },
+                {
+                  "key": "offset",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Direct GET query to Brave Search Page 2 using offset=1."
+          }
+        }
+      ]
+    }
+  ]
+}

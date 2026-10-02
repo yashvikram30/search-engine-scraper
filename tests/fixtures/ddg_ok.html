@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head><title>DuckDuckGo Search</title></head>
+<body>
+  <!-- Ad item (should be skipped) -->
+  <div class="result result--ad">
+    <a class="result__a" href="https://example.com/ad">Sponsored thing</a>
+    <div class="result__snippet">This is an ad snippet.</div>
+  </div>
+
+  <!-- Internal DDG link (should be skipped) -->
+  <div class="result">
+    <a class="result__a" href="https://duckduckgo.com/feedback">DuckDuckGo Feedback</a>
+    <div class="result__snippet">Give feedback.</div>
+  </div>
+
+  <!-- 6 Valid search results -->
+  <div class="result">
+    <a class="result__a" href="https://duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fresult1">Result Title 1</a>
+    <div class="result__snippet">Snippet text for result 1.</div>
+  </div>
+  <div class="result">
+    <a class="result__a" href="https://example.org/result2">Result Title 2</a>
+    <div class="result__snippet">Snippet text for result 2.</div>
+  </div>
+  <div class="result">
+    <a class="result__a" href="https://duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.net%2Fresult3">Result Title 3</a>
+    <div class="result__snippet">Snippet text for result 3.</div>
+  </div>
+  <div class="result">
+    <a class="result__a" href="https://example.io/result4">Result Title 4</a>
+    <div class="result__snippet">Snippet text for result 4.</div>
+  </div>
+  <div class="result">
+    <a class="result__a" href="https://example.co/result5">Result Title 5</a>
+    <div class="result__snippet">Snippet text for result 5.</div>
+  </div>
+  <div class="result">
+    <a class="result__a" href="https://example.dev/result6">Result Title 6</a>
+    <div class="result__snippet">Snippet text for result 6.</div>
+  </div>
+  <!-- Next Page Form -->
+  <form action="/html/" method="post">
+    <input type="submit" value="Next" />
+    <input type="hidden" name="q" value="hello world" />
+    <input type="hidden" name="s" value="6" />
+    <input type="hidden" name="dc" value="7" />
+    <input type="hidden" name="vqd" value="test-token-12345" />
+    <input type="hidden" name="api" value="d.js" />
+    <input type="hidden" name="v" value="l" />
+    <input type="hidden" name="o" value="json" />
+    <input type="hidden" name="kl" value="us-en" />
+  </form>
+</body>
+</html>
