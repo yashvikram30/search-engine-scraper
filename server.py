@@ -1,4 +1,4 @@
-"""Local HTTP Server for testing DuckDuckGo and Brave Search Scrapers via Postman or curl."""
+"""Local HTTP Server for testing DuckDuckGo, Brave and Google Search Scrapers via Postman or curl."""
 from __future__ import annotations
 
 import asyncio
@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlparse
 from ddg_scraper.brave.engine import BraveEngine
 from ddg_scraper.brave.playwright_engine import BravePlaywrightEngine
 from ddg_scraper.ddg.engine import DuckDuckGoEngine
+from ddg_scraper.google.engine import GooglePlaywrightEngine
 from ddg_scraper.models import SearchQuery
 from pathlib import Path
 from ddg_scraper.net import ProxyPool
@@ -58,6 +59,15 @@ engine_ddg_post = DuckDuckGoEngine(pool, method="POST")
 engine_ddg_get = DuckDuckGoEngine(pool, method="GET")
 engine_brave = BraveEngine(pool)
 engine_brave_playwright = BravePlaywrightEngine(pool)
+# Google needs a real browser. Headed by default (headless is more likely to be blocked).
+# Set GOOGLE_HEADLESS=1 to hide the window. The Chrome profile (cookies) lives in ./g_profile.
+engine_google = GooglePlaywrightEngine(
+    pool,
+    headless=os.environ.get("GOOGLE_HEADLESS", "0") == "1",
+    profile_dir=os.environ.get("GOOGLE_PROFILE_DIR", str(Path(__file__).parent / "g_profile")),
+)
+
+SUPPORTED_ENGINES = "'ddg', 'brave', 'brave-playwright', 'google'"
 
 
 class ScraperHandler(BaseHTTPRequestHandler):
@@ -78,6 +88,8 @@ class ScraperHandler(BaseHTTPRequestHandler):
             return engine_brave_playwright
         if engine_name in ("brave", "bravesearch"):
             return engine_brave
+        if engine_name in ("google", "google-playwright", "google_playwright", "g"):
+            return engine_google
         if engine_name in ("ddg", "duckduckgo", ""):
             return engine_ddg_post if method.upper() == "POST" else engine_ddg_get
         return None
@@ -109,7 +121,7 @@ class ScraperHandler(BaseHTTPRequestHandler):
 
             eng = self._select_engine(engine_name, method)
             if eng is None:
-                err_msg = f"Unsupported engine '{engine_name}'. Supported: 'ddg', 'brave', 'brave-playwright'."
+                err_msg = f"Unsupported engine '{engine_name}'. Supported: {SUPPORTED_ENGINES}."
                 print(f"[SERVER] [400] {err_msg}", flush=True)
                 self._send_json(400, {"error": err_msg})
                 return
@@ -188,7 +200,7 @@ class ScraperHandler(BaseHTTPRequestHandler):
 
             eng = self._select_engine(engine_name, method)
             if eng is None:
-                err_msg = f"Unsupported engine '{engine_name}'. Supported: 'ddg', 'brave', 'brave-playwright'."
+                err_msg = f"Unsupported engine '{engine_name}'. Supported: {SUPPORTED_ENGINES}."
                 print(f"[SERVER] [400] {err_msg}", flush=True)
                 self._send_json(400, {"error": err_msg})
                 return
@@ -247,13 +259,14 @@ def run(port: int | None = None):
         port = int(os.environ.get("PORT", "8080"))
     server = HTTPServer(("0.0.0.0", port), ScraperHandler)
     print(f"Scraper API Server listening at http://localhost:{port}")
-    print(f"  - HTTP Backend: {'curl-cffi (Chrome 120 TLS fingerprint)' if pool.is_curl_cffi else 'httpx'}")
+    print(f"  - HTTP Backend: {'curl-cffi (Chrome TLS impersonation)' if pool.is_curl_cffi else 'httpx'}")
     print(f"  - Proxies active: {len(proxies)} ({'Direct mode / no proxies' if not proxies else 'Proxy pool active'})")
     print(f"  - Health check: http://localhost:{port}/health")
     print(f"  - DDG Search (GET): http://localhost:{port}/search?q=python&engine=ddg")
     print(f"  - Brave Search (GET): http://localhost:{port}/search?q=python&engine=brave")
     print(f"  - Brave Playwright (GET): http://localhost:{port}/search?q=python&engine=brave-playwright")
-    print(f"  - Search (POST): http://localhost:{port}/search (JSON body with engine='ddg'|'brave'|'brave-playwright')")
+    print(f"  - Google (GET): http://localhost:{port}/search?q=python&engine=google")
+    print(f"  - Search (POST): http://localhost:{port}/search (JSON body with engine='ddg'|'brave'|'brave-playwright'|'google')")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -262,6 +275,10 @@ def run(port: int | None = None):
         server.server_close()
         try:
             asyncio.run_coroutine_threadsafe(engine_brave_playwright.aclose(), async_loop).result(timeout=2.0)
+        except Exception:
+            pass
+        try:
+            asyncio.run_coroutine_threadsafe(engine_google.aclose(), async_loop).result(timeout=2.0)
         except Exception:
             pass
         try:

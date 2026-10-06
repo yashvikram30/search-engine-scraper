@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Search Scraper API (DuckDuckGo, Brave HTTP & Brave Playwright)",
-    "description": "Comprehensive Postman Collection to test DuckDuckGo, Brave Search (HTTP), and Brave Search (Playwright Headless Browser) via the local Scraper API server as well as directly against search engine endpoints.",
+    "name": "Search Scraper API (DuckDuckGo, Brave & Google)",
+    "description": "Postman collection for the local Scraper API (DuckDuckGo, Brave HTTP, Brave Playwright, Google Playwright) plus direct requests to the search engines. Start the server first: `python3 server.py` (default http://localhost:8080). Folders 1-4 include tests that check status, result count, contiguous positions and page counts.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,6 +13,11 @@
     {
       "key": "pages",
       "value": "3",
+      "type": "string"
+    },
+    {
+      "key": "deepPages",
+      "value": "10",
       "type": "string"
     }
   ],
@@ -27,8 +32,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/search?q=machine+learning&pages={{pages}}&region=us-en&engine=ddg&method=POST",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -48,7 +57,7 @@
                 {
                   "key": "engine",
                   "value": "ddg",
-                  "description": "Engine to use: 'ddg', 'brave', or 'brave-playwright'"
+                  "description": "Engine to use: 'ddg', 'brave', 'brave-playwright' or 'google'"
                 },
                 {
                   "key": "method",
@@ -76,8 +85,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/search",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ]
             },
             "description": "Sends search query, target page count, and engine in JSON body. Returns unified JSON results."
           }
@@ -89,8 +102,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/search?q=fastapi+tutorial&pages=1&region=us-en&engine=ddg&method=POST",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -106,7 +123,8 @@
                 },
                 {
                   "key": "engine",
-                  "value": "ddg"
+                  "value": "ddg",
+                  "description": "Engine to use: 'ddg', 'brave', 'brave-playwright' or 'google'"
                 },
                 {
                   "key": "method",
@@ -115,6 +133,73 @@
               ]
             },
             "description": "Standard single-page DDG search returning top results."
+          }
+        },
+        {
+          "name": "Local DDG - Deep Search (10 pages)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=python+web+scraping&pages={{deepPages}}&region=us-en&engine=ddg&method=POST",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "python+web+scraping"
+                },
+                {
+                  "key": "pages",
+                  "value": "{{deepPages}}"
+                },
+                {
+                  "key": "region",
+                  "value": "us-en"
+                },
+                {
+                  "key": "engine",
+                  "value": "ddg"
+                },
+                {
+                  "key": "method",
+                  "value": "POST"
+                }
+              ]
+            },
+            "description": "Regression test for the old page-3 cap. Before the curl_cffi fix, page 4 returned HTTP 202 (cc=botnet)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"went past page 3\", () => pm.expect(pm.response.json().pages_scraped).to.be.above(3));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "DDG through curl_cffi (Chrome TLS impersonation). Pages chain vqd tokens automatically.",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"status is ok\", () => pm.expect(body.status).to.eql(\"ok\"));",
+              "pm.test(\"has results\", () => pm.expect(body.results.length).to.be.above(0));",
+              "pm.test(\"results_count matches results\", () => pm.expect(body.results_count).to.eql(body.results.length));",
+              "pm.test(\"positions are contiguous from 1\", () => body.results.forEach((r, i) => pm.expect(r.position).to.eql(i + 1)));"
+            ]
           }
         }
       ]
@@ -129,8 +214,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/search?q=rust+concurrency&pages={{pages}}&engine=brave",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -145,7 +234,7 @@
                 {
                   "key": "engine",
                   "value": "brave",
-                  "description": "Engine: 'brave'"
+                  "description": "Engine to use: 'ddg', 'brave', 'brave-playwright' or 'google'"
                 }
               ]
             },
@@ -168,8 +257,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/search",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ]
             },
             "description": "Sends search query and target page count to Brave Engine via JSON POST payload."
           }
@@ -181,8 +274,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/search?q=docker+containers&pages=1&engine=brave",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -194,14 +291,78 @@
                 },
                 {
                   "key": "engine",
-                  "value": "brave"
+                  "value": "brave",
+                  "description": "Engine to use: 'ddg', 'brave', 'brave-playwright' or 'google'"
                 }
               ]
             },
             "description": "Single-page query against Brave Search engine returning structured results."
           }
+        },
+        {
+          "name": "Local Brave HTTP - Page Cap Check (pages=15)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=pokemon&pages=15&engine=brave",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "pokemon"
+                },
+                {
+                  "key": "pages",
+                  "value": "15"
+                },
+                {
+                  "key": "engine",
+                  "value": "brave"
+                }
+              ]
+            },
+            "description": "Asks for more pages than Brave has. Expect status ok with about 6 pages scraped, not an error."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"capped at 6 pages\", () => pm.expect(pm.response.json().pages_scraped).to.be.at.most(6));"
+                ]
+              }
+            }
+          ]
         }
-      ]
+      ],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"status is ok\", () => pm.expect(body.status).to.eql(\"ok\"));",
+              "pm.test(\"has results\", () => pm.expect(body.results.length).to.be.above(0));",
+              "pm.test(\"results_count matches results\", () => pm.expect(body.results_count).to.eql(body.results.length));",
+              "pm.test(\"positions are contiguous from 1\", () => body.results.forEach((r, i) => pm.expect(r.position).to.eql(i + 1)));",
+              "pm.test(\"no duplicate URLs\", () => {",
+              "  const urls = body.results.map(r => r.url);",
+              "  pm.expect(new Set(urls).size).to.eql(urls.length);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "description": "Brave over HTTP. Brave returns about 6 pages (~120 results) per query; page 7 comes back empty."
     },
     {
       "name": "3. Brave Search Scraper - Playwright Browser (Local API)",
@@ -213,8 +374,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/search?q=kubernetes+deployments&pages={{pages}}&engine=brave-playwright",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -229,7 +394,7 @@
                 {
                   "key": "engine",
                   "value": "brave-playwright",
-                  "description": "Headless browser engine with stealth patches"
+                  "description": "Engine to use: 'ddg', 'brave', 'brave-playwright' or 'google'"
                 }
               ]
             },
@@ -252,8 +417,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/search",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ]
             },
             "description": "Sends query to Playwright headless browser engine via JSON POST."
           }
@@ -265,8 +434,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/search?q=rust+tokio+tutorial&pages=1&engine=brave-playwright",
-              "host": ["{{baseUrl}}"],
-              "path": ["search"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -278,17 +451,274 @@
                 },
                 {
                   "key": "engine",
-                  "value": "brave-playwright"
+                  "value": "brave-playwright",
+                  "description": "Engine to use: 'ddg', 'brave', 'brave-playwright' or 'google'"
                 }
               ]
             },
             "description": "Single-page Playwright query against Brave Search."
           }
+        },
+        {
+          "name": "Local Brave Playwright - Page Cap Check (pages=15)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=rust+concurrency&pages=15&engine=brave-playwright",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust+concurrency"
+                },
+                {
+                  "key": "pages",
+                  "value": "15"
+                },
+                {
+                  "key": "engine",
+                  "value": "brave-playwright"
+                }
+              ]
+            },
+            "description": "Asks for more pages than Brave has. Expect status ok with about 6 pages scraped."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"capped at 6 pages\", () => pm.expect(pm.response.json().pages_scraped).to.be.at.most(6));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"status is ok\", () => pm.expect(body.status).to.eql(\"ok\"));",
+              "pm.test(\"has results\", () => pm.expect(body.results.length).to.be.above(0));",
+              "pm.test(\"results_count matches results\", () => pm.expect(body.results_count).to.eql(body.results.length));",
+              "pm.test(\"positions are contiguous from 1\", () => body.results.forEach((r, i) => pm.expect(r.position).to.eql(i + 1)));",
+              "pm.test(\"no duplicate URLs\", () => {",
+              "  const urls = body.results.map(r => r.url);",
+              "  pm.expect(new Set(urls).size).to.eql(urls.length);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "description": "Brave through headless Chromium. Same ~6 page limit as the HTTP engine."
+    },
+    {
+      "name": "4. Google Scraper - Playwright Browser (Local API)",
+      "description": "Google needs a real browser, so this opens a visible Chrome window (set GOOGLE_HEADLESS=1 to hide it; headless is more likely to be blocked). Searches run one at a time, with a 3-8s pause between pages, so 3 pages take roughly 15-25s. Google returns 10 results per page. A status of 'blocked' means Google served a CAPTCHA or consent page; wait before retrying and check debug_google.html.",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"status is ok\", () => pm.expect(body.status).to.eql(\"ok\"));",
+              "pm.test(\"has results\", () => pm.expect(body.results.length).to.be.above(0));",
+              "pm.test(\"results_count matches results\", () => pm.expect(body.results_count).to.eql(body.results.length));",
+              "pm.test(\"positions are contiguous from 1\", () => body.results.forEach((r, i) => pm.expect(r.position).to.eql(i + 1)));",
+              "pm.test(\"no duplicate URLs\", () => {",
+              "  const urls = body.results.map(r => r.url);",
+              "  pm.expect(new Set(urls).size).to.eql(urls.length);",
+              "});",
+              "pm.test(\"each page adds results (about 10 per page)\", () => pm.expect(body.results.length).to.be.at.least(body.pages_scraped * 5));"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Local Google - GET Multi-Page Search (x Pages)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=rust+concurrency&pages={{pages}}&region=us-en&engine=google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust+concurrency"
+                },
+                {
+                  "key": "pages",
+                  "value": "{{pages}}"
+                },
+                {
+                  "key": "region",
+                  "value": "us-en"
+                },
+                {
+                  "key": "engine",
+                  "value": "google"
+                }
+              ]
+            },
+            "description": "Scrapes 'x' pages from Google by clicking Next in one browser session."
+          }
+        },
+        {
+          "name": "Local Google - POST Multi-Page Search (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"python asyncio tutorial\",\n  \"pages\": 3,\n  \"region\": \"us-en\",\n  \"engine\": \"google\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ]
+            },
+            "description": "Same as the GET version, with the query and options in a JSON body."
+          }
+        },
+        {
+          "name": "Local Google - Single Page Search (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=docker+containers&pages=1&region=us-en&engine=google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "docker+containers"
+                },
+                {
+                  "key": "pages",
+                  "value": "1"
+                },
+                {
+                  "key": "region",
+                  "value": "us-en"
+                },
+                {
+                  "key": "engine",
+                  "value": "google"
+                }
+              ]
+            },
+            "description": "One page (about 10 organic results). Best first test after setup."
+          }
+        },
+        {
+          "name": "Local Google - Japan Region (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=tokyo+ramen&pages=1&region=jp-jp&engine=google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "tokyo+ramen"
+                },
+                {
+                  "key": "pages",
+                  "value": "1"
+                },
+                {
+                  "key": "region",
+                  "value": "jp-jp"
+                },
+                {
+                  "key": "engine",
+                  "value": "google"
+                }
+              ]
+            },
+            "description": "Region 'jp-jp' maps to Google gl=jp, hl=ja."
+          }
+        },
+        {
+          "name": "Local Google - Deeper Search (5 pages)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=rust+concurrency&pages=5&region=us-en&engine=google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust+concurrency"
+                },
+                {
+                  "key": "pages",
+                  "value": "5"
+                },
+                {
+                  "key": "region",
+                  "value": "us-en"
+                },
+                {
+                  "key": "engine",
+                  "value": "google"
+                }
+              ]
+            },
+            "description": "Use sparingly. More pages means more time on Google and a higher chance of a CAPTCHA."
+          }
         }
       ]
     },
     {
-      "name": "4. Server Health & Monitoring",
+      "name": "5. Server Health & Monitoring",
       "item": [
         {
           "name": "Health Check (Cooling Proxy Count)",
@@ -297,8 +727,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
             },
             "description": "Checks server health status and reports the number of proxies currently cooling down."
           }
@@ -306,7 +740,7 @@
       ]
     },
     {
-      "name": "5. Direct Search Engine Requests",
+      "name": "6. Direct Search Engine Requests",
       "item": [
         {
           "name": "Direct DDG - POST (Returns HTTP 200 Real Results)",
@@ -369,8 +803,15 @@
             "url": {
               "raw": "https://html.duckduckgo.com/html/",
               "protocol": "https",
-              "host": ["html", "duckduckgo", "com"],
-              "path": ["html", ""]
+              "host": [
+                "html",
+                "duckduckgo",
+                "com"
+              ],
+              "path": [
+                "html",
+                ""
+              ]
             },
             "description": "Direct POST to DuckDuckGo HTML endpoint without proxy or local server."
           }
@@ -412,8 +853,15 @@
             "url": {
               "raw": "https://html.duckduckgo.com/html/?q=python",
               "protocol": "https",
-              "host": ["html", "duckduckgo", "com"],
-              "path": ["html", ""],
+              "host": [
+                "html",
+                "duckduckgo",
+                "com"
+              ],
+              "path": [
+                "html",
+                ""
+              ],
               "query": [
                 {
                   "key": "q",
@@ -461,8 +909,14 @@
             "url": {
               "raw": "https://search.brave.com/search?q=rust+programming",
               "protocol": "https",
-              "host": ["search", "brave", "com"],
-              "path": ["search"],
+              "host": [
+                "search",
+                "brave",
+                "com"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -510,8 +964,14 @@
             "url": {
               "raw": "https://search.brave.com/search?q=rust+programming&offset=1",
               "protocol": "https",
-              "host": ["search", "brave", "com"],
-              "path": ["search"],
+              "host": [
+                "search",
+                "brave",
+                "com"
+              ],
+              "path": [
+                "search"
+              ],
               "query": [
                 {
                   "key": "q",
@@ -524,6 +984,40 @@
               ]
             },
             "description": "Direct GET query to Brave Search Page 2 using offset=1."
+          }
+        },
+        {
+          "name": "Direct Google - GET (JS required: expect no usable results)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.google.com/search?q=rust+concurrency&hl=en&gl=us",
+              "protocol": "https",
+              "host": [
+                "www",
+                "google",
+                "com"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust+concurrency"
+                },
+                {
+                  "key": "hl",
+                  "value": "en"
+                },
+                {
+                  "key": "gl",
+                  "value": "us"
+                }
+              ]
+            },
+            "description": "Plain HTTP to Google. Expect a JavaScript-required page, consent page or /sorry/ redirect rather than results. This is why the Google engine uses a real browser."
           }
         }
       ]
