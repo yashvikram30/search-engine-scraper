@@ -14,7 +14,7 @@ from ..models import (
     SearchResult,
     SearchStatus,
 )
-from ..net import PoolExhaustedError, ProxyPool, TtlCache, backoff
+from ..net import PoolExhaustedError, ProxyPool, TtlCache, backoff, headers_for
 from .classify import classify_brave, explain_brave_response
 from .parse import parse_brave_results
 
@@ -84,6 +84,8 @@ class BraveEngine:
             return finish("error", [], 0, 0)
 
         all_results: list[SearchResult] = []
+        seen_urls: set[str] = set()
+        prev_url = ""
         total_attempts = 0
         pages_done = 0
         last_status: SearchStatus = "error"
@@ -120,7 +122,10 @@ class BraveEngine:
                 )
 
                 try:
-                    res = await entry.client.get(url, headers=HEADERS, timeout=TIMEOUT)
+                    extra = {"Referer": prev_url, "Sec-Fetch-Site": "same-origin"} if prev_url else {}
+                    res = await entry.client.get(
+                        url, headers=headers_for(entry.client, HEADERS, extra), timeout=TIMEOUT
+                    )
                     html = res.text
                     page_results = parse_brave_results(html)
                     page_status, reason = explain_brave_response(res.status_code, html, len(page_results))
@@ -148,7 +153,7 @@ class BraveEngine:
 
                 self._pool.report(entry, page_status)
 
-                if page_status in ("ok", "empty"):
+                if page_status in ("ok", "empty", "blocked"):
                     break
                 if page_attempts < MAX_ATTEMPTS:
                     delay = backoff(page_attempts, self._backoff_base)
@@ -163,7 +168,11 @@ class BraveEngine:
             if page_status != "ok":
                 break
 
-            for item in page_results:
+            new_items = [item for item in page_results if item.url not in seen_urls]
+            if not new_items:
+                break  # Brave repeated itself or ran out of results
+            for item in new_items:
+                seen_urls.add(item.url)
                 all_results.append(
                     SearchResult(
                         position=len(all_results) + 1,
@@ -173,6 +182,7 @@ class BraveEngine:
                     )
                 )
 
+            prev_url = url
             pages_done += 1
 
         final_status: SearchStatus

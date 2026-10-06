@@ -89,6 +89,12 @@ def backoff(attempt: int, base: float = 1.0) -> float:
     """Exponential backoff with jitter, in seconds, capped at 30."""
     return min(30.0, base * 2**attempt) + random.random() * 0.5 * base
 
+def headers_for(client: Any, browser_headers: dict[str, str], extra: dict[str, str] | None = None) -> dict[str, str]:
+    """curl_cffi sets its own Chrome headers, so only add per-request ones."""
+    if isinstance(client, CurlCffiClient):
+        return dict(extra or {})
+    return {**browser_headers, **(extra or {})}
+
 class PoolExhaustedError(Exception):
     def __init__(self) -> None:
         super().__init__("All proxies are cooling down")

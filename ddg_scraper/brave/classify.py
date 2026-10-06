@@ -19,13 +19,14 @@ def explain_brave_response(http_status: int, html: str, parsed_count: int) -> tu
         return "blocked", f"Redirect detected (HTTP {http_status})"
     if http_status in (403, 429):
         return "blocked", f"Rate limited or forbidden (HTTP {http_status})"
+    
+    if parsed_count > 0:
+        return "ok", f"Successfully parsed {parsed_count} results (HTTP {http_status})"
 
     bot_match = BOT_PATTERNS.search(html)
     if bot_match:
         return "blocked", f"Bot defense pattern ('{bot_match.group(0)}') detected in HTTP {http_status} body"
 
-    if parsed_count > 0:
-        return "ok", f"Successfully parsed {parsed_count} results (HTTP {http_status})"
 
     if NO_RESULTS_PATTERNS.search(html):
         return "empty", f"Confirmed zero results ('no results found' in HTML)"

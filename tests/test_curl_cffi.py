@@ -1,5 +1,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+from ddg_scraper.net import CurlCffiClient, headers_for
+
 
 import pytest
 import httpx
@@ -12,7 +14,13 @@ from ddg_scraper.crawler_strategy import (
 )
 from ddg_scraper.net import CurlCffiClient, ProxyPool
 
+from ddg_scraper.net import CurlCffiClient, headers_for
 
+def test_headers_for_curl_cffi_sends_only_extra():
+    client = CurlCffiClient()
+    assert headers_for(client, {"User-Agent": "x"}, {"Referer": "y"}) == {"Referer": "y"}
+    assert headers_for(client, {"User-Agent": "x"}) == {}
+    
 def test_build_curl_cffi_strategy():
     strategy = build_curl_cffi_strategy()
     if HAS_CURL_CFFI:

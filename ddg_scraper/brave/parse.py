@@ -11,8 +11,8 @@ def _is_ad_element(el) -> bool:
     classes = el.get("class", [])
     if isinstance(classes, str):
         classes = classes.split()
-    class_str = " ".join(classes).lower()
-    return "ad" in class_str or "sponsored" in class_str
+    tokens = set(" ".join(classes).lower().split())
+    return bool(tokens & {"ad", "ads", "sponsored"})
 
 def parse_brave_results(html: str) -> list[SearchResult]:
     try:
