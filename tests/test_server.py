@@ -13,6 +13,8 @@ def test_select_engine():
     handler = server.ScraperHandler.__new__(server.ScraperHandler)
     assert handler._select_engine("brave", "GET") == server.engine_brave
     assert handler._select_engine("BraveSearch", "GET") == server.engine_brave
+    assert handler._select_engine("brave-playwright", "GET") == server.engine_brave_playwright
+    assert handler._select_engine("playwright", "GET") == server.engine_brave_playwright
     assert handler._select_engine("ddg", "POST") == server.engine_ddg_post
     assert handler._select_engine("ddg", "GET") == server.engine_ddg_get
     assert handler._select_engine("duckduckgo", "GET") == server.engine_ddg_get

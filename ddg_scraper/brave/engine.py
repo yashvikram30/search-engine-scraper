@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from datetime import datetime, timezone
 from urllib.parse import urlencode
@@ -14,7 +15,7 @@ from ..models import (
     SearchStatus,
 )
 from ..net import PoolExhaustedError, ProxyPool, TtlCache, backoff
-from .classify import classify_brave
+from .classify import classify_brave, explain_brave_response
 from .parse import parse_brave_results
 
 ENDPOINT = "https://search.brave.com/search"
@@ -104,6 +105,7 @@ class BraveEngine:
                 try:
                     entry, wait = self._pool.acquire()
                 except PoolExhaustedError:
+                    print(f"[{self.name.upper()}] [ERROR] Page {page_idx + 1}/{total_pages}: PoolExhaustedError - all proxies are cooling down", flush=True)
                     page_status = "error"
                     break
 
@@ -111,20 +113,51 @@ class BraveEngine:
                     await asyncio.sleep(wait)
 
                 url = build_brave_url(query, current_offset)
+                print(
+                    f"[{self.name.upper()}] Page {page_idx + 1}/{total_pages} (offset={current_offset}, "
+                    f"attempt {page_attempts}/{MAX_ATTEMPTS}) [{entry.url}] -> GET {url}",
+                    flush=True,
+                )
+
                 try:
                     res = await entry.client.get(url, headers=HEADERS, timeout=TIMEOUT)
                     html = res.text
                     page_results = parse_brave_results(html)
-                    page_status = classify_brave(res.status_code, html, len(page_results))
-                except httpx.HTTPError:
+                    page_status, reason = explain_brave_response(res.status_code, html, len(page_results))
+
+                    snippet = re.sub(r"\s+", " ", html[:160]).strip()
+                    if page_status == "ok":
+                        print(
+                            f"[{self.name.upper()}] [SUCCESS] HTTP {res.status_code} ({len(html):,} bytes) "
+                            f"-> Parsed {len(page_results)} results",
+                            flush=True,
+                        )
+                    else:
+                        print(
+                            f"[{self.name.upper()}] [{page_status.upper()}] Could not scrape page: {reason} "
+                            f"(Server responded with HTTP {res.status_code}, {len(html):,} bytes) | Body: \"{snippet}...\"",
+                            flush=True,
+                        )
+                except httpx.HTTPError as ex:
                     page_status = "error"
+                    print(
+                        f"[{self.name.upper()}] [ERROR] Network/HTTP Exception on attempt {page_attempts}/{MAX_ATTEMPTS} "
+                        f"via [{entry.url}]: {type(ex).__name__}: {ex}",
+                        flush=True,
+                    )
 
                 self._pool.report(entry, page_status)
 
                 if page_status in ("ok", "empty"):
                     break
                 if page_attempts < MAX_ATTEMPTS:
-                    await asyncio.sleep(backoff(page_attempts, self._backoff_base))
+                    delay = backoff(page_attempts, self._backoff_base)
+                    print(
+                        f"[{self.name.upper()}] Retrying page {page_idx + 1} in {delay:.1f}s "
+                        f"(next attempt {page_attempts + 1}/{MAX_ATTEMPTS})...",
+                        flush=True,
+                    )
+                    await asyncio.sleep(delay)
 
             last_status = page_status
             if page_status != "ok":
@@ -151,6 +184,13 @@ class BraveEngine:
             final_status = last_status
 
         resp = finish(final_status, all_results, total_attempts, pages_done)
+        print(
+            f"[{self.name.upper()}] Completed search query='{q.query}': status='{final_status}' | "
+            f"pages={pages_done}/{total_pages} | results={len(all_results)} | total_attempts={total_attempts} | "
+            f"latency={resp.latency_ms}ms",
+            flush=True,
+        )
+
         if final_status in ("ok", "empty"):
             self._cache.set(key, resp)
         return resp

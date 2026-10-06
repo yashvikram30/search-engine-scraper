@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Search Scraper API (DuckDuckGo & Brave)",
-    "description": "Comprehensive Postman Collection to test DuckDuckGo and Brave Search via the local Scraper API server as well as directly against search engine endpoints.",
+    "name": "Search Scraper API (DuckDuckGo, Brave HTTP & Brave Playwright)",
+    "description": "Comprehensive Postman Collection to test DuckDuckGo, Brave Search (HTTP), and Brave Search (Playwright Headless Browser) via the local Scraper API server as well as directly against search engine endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -48,7 +48,7 @@
                 {
                   "key": "engine",
                   "value": "ddg",
-                  "description": "Engine to use: 'ddg' or 'brave'"
+                  "description": "Engine to use: 'ddg', 'brave', or 'brave-playwright'"
                 },
                 {
                   "key": "method",
@@ -120,10 +120,10 @@
       ]
     },
     {
-      "name": "2. Brave Search Scraper (Local API)",
+      "name": "2. Brave Search Scraper - HTTP (Local API)",
       "item": [
         {
-          "name": "Local Brave - GET Multi-Page Search (x Pages)",
+          "name": "Local Brave HTTP - GET Multi-Page Search (x Pages)",
           "request": {
             "method": "GET",
             "header": [],
@@ -145,15 +145,15 @@
                 {
                   "key": "engine",
                   "value": "brave",
-                  "description": "Engine to use: 'brave'"
+                  "description": "Engine: 'brave'"
                 }
               ]
             },
-            "description": "Scrapes 'x' pages sequentially from Brave Search using offset pagination (offset 0, 1, 2...)."
+            "description": "Scrapes 'x' pages sequentially from Brave Search via HTTP client using offset pagination."
           }
         },
         {
-          "name": "Local Brave - POST Multi-Page Search (JSON)",
+          "name": "Local Brave HTTP - POST Multi-Page Search (JSON)",
           "request": {
             "method": "POST",
             "header": [
@@ -175,7 +175,7 @@
           }
         },
         {
-          "name": "Local Brave - Single Page Search (GET)",
+          "name": "Local Brave HTTP - Single Page Search (GET)",
           "request": {
             "method": "GET",
             "header": [],
@@ -204,7 +204,91 @@
       ]
     },
     {
-      "name": "3. Server Health & Monitoring",
+      "name": "3. Brave Search Scraper - Playwright Browser (Local API)",
+      "item": [
+        {
+          "name": "Local Brave Playwright - GET Multi-Page Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=kubernetes+deployments&pages={{pages}}&engine=brave-playwright",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "kubernetes deployments",
+                  "description": "Search query terms"
+                },
+                {
+                  "key": "pages",
+                  "value": "{{pages}}",
+                  "description": "Number of pages to scrape (e.g. 1, 2)"
+                },
+                {
+                  "key": "engine",
+                  "value": "brave-playwright",
+                  "description": "Headless browser engine with stealth patches"
+                }
+              ]
+            },
+            "description": "Uses headless Chromium via Playwright with stealth scripts to execute JavaScript and fetch Brave Search results."
+          }
+        },
+        {
+          "name": "Local Brave Playwright - POST Multi-Page Search (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"distributed systems consensus raft\",\n  \"pages\": 2,\n  \"engine\": \"brave-playwright\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"]
+            },
+            "description": "Sends query to Playwright headless browser engine via JSON POST."
+          }
+        },
+        {
+          "name": "Local Brave Playwright - Single Page Search (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=rust+tokio+tutorial&pages=1&engine=brave-playwright",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "rust tokio tutorial"
+                },
+                {
+                  "key": "pages",
+                  "value": "1"
+                },
+                {
+                  "key": "engine",
+                  "value": "brave-playwright"
+                }
+              ]
+            },
+            "description": "Single-page Playwright query against Brave Search."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Server Health & Monitoring",
       "item": [
         {
           "name": "Health Check (Cooling Proxy Count)",
@@ -222,7 +306,7 @@
       ]
     },
     {
-      "name": "4. Direct Search Engine Requests",
+      "name": "5. Direct Search Engine Requests",
       "item": [
         {
           "name": "Direct DDG - POST (Returns HTTP 200 Real Results)",

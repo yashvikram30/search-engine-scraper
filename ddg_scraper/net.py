@@ -1,12 +1,89 @@
 from __future__ import annotations
 
+import logging
+import os
 import random
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
 from .models import SearchStatus
+
+log = logging.getLogger(__name__)
+
+try:
+    from curl_cffi.requests import AsyncSession
+
+    HAS_CURL_CFFI = True
+except ImportError:
+    AsyncSession = None  # type: ignore[assignment]
+    HAS_CURL_CFFI = False
+    log.warning("curl_cffi not available; falling back to httpx.AsyncClient")
+
+
+class CurlCffiClient:
+    """Async HTTP client backed by curl_cffi for real Chrome 120 TLS fingerprints."""
+
+    def __init__(
+        self,
+        proxy: str | None = None,
+        impersonate: str = "chrome120",
+        allow_redirects: bool = False,
+    ) -> None:
+        if not HAS_CURL_CFFI or AsyncSession is None:
+            raise RuntimeError("curl_cffi is not available")
+        self._proxy = proxy
+        self._impersonate = impersonate
+        self._allow_redirects = allow_redirects
+        self._session = AsyncSession(
+            proxy=proxy if proxy and proxy != "direct" else None,
+            impersonate=impersonate,
+            allow_redirects=allow_redirects,
+        )
+
+    async def get(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        try:
+            return await self._session.get(
+                url,
+                headers=headers,
+                timeout=timeout,
+                **kwargs,
+            )
+        except Exception as e:
+            raise httpx.HTTPError(str(e)) from e
+
+    async def post(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        try:
+            return await self._session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=timeout,
+                **kwargs,
+            )
+        except Exception as e:
+            raise httpx.HTTPError(str(e)) from e
+
+    async def aclose(self) -> None:
+        await self._session.close()
+
 
 def backoff(attempt: int, base: float = 1.0) -> float:
     """Exponential backoff with jitter, in seconds, capped at 30."""
@@ -19,7 +96,7 @@ class PoolExhaustedError(Exception):
 @dataclass
 class PoolEntry:
     url: str
-    client: httpx.AsyncClient
+    client: httpx.AsyncClient | CurlCffiClient
     next_free_at: float = 0.0  # earliest time this proxy may send again
     cooldown_until: float = 0.0  # quarantine after a block
     consecutive_errors: int = 0
@@ -38,24 +115,49 @@ class ProxyPool:
     def __init__(
         self,
         urls: list[str],
-        min_interval: float,
+        min_interval: float = 1.5,
         cooldown: float = 30 * 60,
         transport: httpx.AsyncBaseTransport | None = None,
+        use_curl_cffi: bool | None = None,
     ) -> None:
         self._direct = not urls
         self._min_interval = min_interval
         self._cooldown = cooldown
         sources: list[str | None] = [None] if self._direct else list(urls)
+
+        if transport is not None:
+            self._use_curl_cffi = False
+        elif use_curl_cffi is not None:
+            self._use_curl_cffi = use_curl_cffi and HAS_CURL_CFFI
+        else:
+            env_pref = os.environ.get("USE_CURL_CFFI", "1").lower()
+            self._use_curl_cffi = HAS_CURL_CFFI and (env_pref not in ("0", "false", "no"))
+
+        def create_client(proxy_url: str | None) -> httpx.AsyncClient | CurlCffiClient:
+            if self._use_curl_cffi:
+                try:
+                    return CurlCffiClient(
+                        proxy=proxy_url,
+                        impersonate="chrome120",
+                        allow_redirects=False,
+                    )
+                except Exception as ex:
+                    log.warning("Failed to initialize CurlCffiClient (%s); falling back to httpx", ex)
+            return httpx.AsyncClient(
+                proxy=proxy_url, transport=transport, follow_redirects=False
+            )
+
         self._entries = [
             PoolEntry(
                 url=url or "direct",
-                # no redirects: a redirect is a signal, not a route
-                client=httpx.AsyncClient(
-                    proxy=url, transport=transport, follow_redirects=False
-                ),
+                client=create_client(url),
             )
             for url in sources
         ]
+
+    @property
+    def is_curl_cffi(self) -> bool:
+        return self._use_curl_cffi
 
     def acquire(self) -> tuple[PoolEntry, float]:
         """Pick the proxy that is free soonest and reserve its next slot.

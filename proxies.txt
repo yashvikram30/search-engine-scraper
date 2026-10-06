@@ -1,0 +1,10 @@
+# Paste your residential proxy URLs below (one per line).
+# Lines starting with '#' are ignored.
+#
+# Supported formats:
+#   http://username:password@proxy-domain.com:port
+#   http://proxy-domain.com:port
+#   socks5://username:password@proxy-domain.com:port
+#
+# Example:
+# http://user123:pass456@residential.proxyprovider.com:8000

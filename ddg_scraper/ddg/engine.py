@@ -16,7 +16,7 @@ from ..models import (
     SearchStatus,
 )
 from ..net import PoolExhaustedError, ProxyPool, TtlCache, backoff
-from .classify import classify
+from .classify import classify, explain_ddg_response
 from .parse import extract_next_page_payload, parse_results
 
 ENDPOINT = "https://html.duckduckgo.com/html/"
@@ -123,34 +123,65 @@ class DuckDuckGoEngine:
                 try:
                     entry, wait = self._pool.acquire()  # a different proxy each attempt
                 except PoolExhaustedError:
+                    print(f"[{self.name.upper()}] [ERROR] Page {page_idx}/{total_pages}: PoolExhaustedError - all proxies are cooling down", flush=True)
                     page_status = "error"
                     break
                 if wait > 0:
                     await asyncio.sleep(wait)
 
+                req_method = "POST" if (self._method == "POST" or page_idx > 1) else "GET"
+                target_url = ENDPOINT if req_method == "POST" else build_url(query, q.region)
+                print(
+                    f"[{self.name.upper()}] Page {page_idx}/{total_pages} (attempt {page_attempts}/{MAX_ATTEMPTS}) "
+                    f"[{entry.url}] -> {req_method} {target_url}",
+                    flush=True,
+                )
+
                 try:
-                    if self._method == "POST" or page_idx > 1:
-                        # Page 2 and later always use POST with the next_payload form data
+                    if req_method == "POST":
                         res = await entry.client.post(
                             ENDPOINT, data=current_payload, headers=HEADERS, timeout=TIMEOUT
                         )
                     else:
-                        url = build_url(query, q.region)
-                        res = await entry.client.get(url, headers=HEADERS, timeout=TIMEOUT)
+                        res = await entry.client.get(target_url, headers=HEADERS, timeout=TIMEOUT)
                     html = res.text
                     page_results = parse_results(html)
-                    page_status = classify(res.status_code, html, len(page_results))
+                    page_status, reason = explain_ddg_response(res.status_code, html, len(page_results))
+
+                    snippet = re.sub(r"\s+", " ", html[:160]).strip()
                     if page_status == "ok":
+                        print(
+                            f"[{self.name.upper()}] [SUCCESS] HTTP {res.status_code} ({len(html):,} bytes) "
+                            f"-> Parsed {len(page_results)} results",
+                            flush=True,
+                        )
                         next_payload = extract_next_page_payload(html)
-                except httpx.HTTPError:
+                    else:
+                        print(
+                            f"[{self.name.upper()}] [{page_status.upper()}] Could not scrape page: {reason} "
+                            f"(Server responded with HTTP {res.status_code}, {len(html):,} bytes) | Body: \"{snippet}...\"",
+                            flush=True,
+                        )
+                except httpx.HTTPError as ex:
                     page_status = "error"  # includes timeouts
+                    print(
+                        f"[{self.name.upper()}] [ERROR] Network/HTTP Exception on attempt {page_attempts}/{MAX_ATTEMPTS} "
+                        f"via [{entry.url}]: {type(ex).__name__}: {ex}",
+                        flush=True,
+                    )
 
                 self._pool.report(entry, page_status)
 
                 if page_status in ("ok", "empty"):
                     break
                 if page_attempts < MAX_ATTEMPTS:
-                    await asyncio.sleep(backoff(page_attempts, self._backoff_base))
+                    delay = backoff(page_attempts, self._backoff_base)
+                    print(
+                        f"[{self.name.upper()}] Retrying page {page_idx} in {delay:.1f}s "
+                        f"(next attempt {page_attempts + 1}/{MAX_ATTEMPTS})...",
+                        flush=True,
+                    )
+                    await asyncio.sleep(delay)
 
             last_status = page_status
             if page_status != "ok":
@@ -175,6 +206,13 @@ class DuckDuckGoEngine:
 
         final_status = "ok" if all_results else (last_status if pages_done == 0 else "ok")
         response = finish(final_status, all_results, total_attempts, pages_done)
+
+        print(
+            f"[{self.name.upper()}] Completed search query='{q.query}': status='{final_status}' | "
+            f"pages={pages_done}/{total_pages} | results={len(all_results)} | total_attempts={total_attempts} | "
+            f"latency={response.latency_ms}ms",
+            flush=True,
+        )
 
         # only cache successful answers
         if final_status in ("ok", "empty"):

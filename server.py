@@ -9,20 +9,55 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from ddg_scraper.brave.engine import BraveEngine
+from ddg_scraper.brave.playwright_engine import BravePlaywrightEngine
 from ddg_scraper.ddg.engine import DuckDuckGoEngine
 from ddg_scraper.models import SearchQuery
+from pathlib import Path
 from ddg_scraper.net import ProxyPool
+
+
+def load_proxies() -> list[str]:
+    # 1. Environment variable PROXY_URLS
+    env_val = os.environ.get("PROXY_URLS", "")
+    if env_val.strip():
+        return [p.strip() for p in env_val.split(",") if p.strip()]
+
+    # 2. Check .env file in project root
+    env_file = Path(__file__).parent / ".env"
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, val = line.split("=", 1)
+                key = key.strip()
+                val = val.strip().strip("'\"")
+                if key == "PROXY_URLS" and val:
+                    return [p.strip() for p in val.split(",") if p.strip()]
+
+    # 3. Check proxies.txt file
+    file_path = Path(__file__).parent / "proxies.txt"
+    if file_path.exists():
+        lines = [l.strip() for l in file_path.read_text(encoding="utf-8").splitlines()]
+        return [l for l in lines if l and not l.startswith("#")]
+
+    return []
+
 
 # Dedicated persistent asyncio event loop for the server lifetime
 async_loop = asyncio.new_event_loop()
 threading.Thread(target=async_loop.run_forever, daemon=True).start()
 
 # Configure pool and engines
-proxies = [p for p in os.environ.get("PROXY_URLS", "").split(",") if p]
-pool = ProxyPool(proxies, min_interval=float(os.environ.get("MIN_INTERVAL_S", "1.5")))
+proxies = load_proxies()
+default_cooldown = 0.0 if len(proxies) <= 1 else 300.0
+cooldown_s = float(os.environ.get("COOLDOWN_S", str(default_cooldown)))
+pool = ProxyPool(proxies, min_interval=float(os.environ.get("MIN_INTERVAL_S", "1.5")), cooldown=cooldown_s)
 engine_ddg_post = DuckDuckGoEngine(pool, method="POST")
 engine_ddg_get = DuckDuckGoEngine(pool, method="GET")
 engine_brave = BraveEngine(pool)
+engine_brave_playwright = BravePlaywrightEngine(pool)
 
 
 class ScraperHandler(BaseHTTPRequestHandler):
@@ -39,6 +74,8 @@ class ScraperHandler(BaseHTTPRequestHandler):
 
     def _select_engine(self, engine_name: str, method: str):
         engine_name = engine_name.lower().strip()
+        if engine_name in ("brave-playwright", "playwright", "brave_playwright", "pw"):
+            return engine_brave_playwright
         if engine_name in ("brave", "bravesearch"):
             return engine_brave
         if engine_name in ("ddg", "duckduckgo", ""):
@@ -48,7 +85,11 @@ class ScraperHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/health":
-            self._send_json(200, {"status": "ok", "cooling_proxies": pool.cooling_count()})
+            self._send_json(200, {
+                "status": "ok",
+                "cooling_proxies": pool.cooling_count(),
+                "curl_cffi": pool.is_curl_cffi,
+            })
             return
 
         if parsed.path == "/search":
@@ -68,14 +109,32 @@ class ScraperHandler(BaseHTTPRequestHandler):
 
             eng = self._select_engine(engine_name, method)
             if eng is None:
-                self._send_json(400, {"error": f"Unsupported engine '{engine_name}'. Use 'ddg' or 'brave'."})
+                err_msg = f"Unsupported engine '{engine_name}'. Supported: 'ddg', 'brave', 'brave-playwright'."
+                print(f"[SERVER] [400] {err_msg}", flush=True)
+                self._send_json(400, {"error": err_msg})
                 return
 
-            future = asyncio.run_coroutine_threadsafe(
-                eng.search(SearchQuery(query=query, region=region, max_pages=pages)),
-                async_loop,
+            print(
+                f"\n[SERVER] ---> Incoming GET /search | query='{query}' engine='{engine_name}' method='{method}' pages={pages}",
+                flush=True,
             )
-            res = future.result()
+
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    eng.search(SearchQuery(query=query, region=region, max_pages=pages)),
+                    async_loop,
+                )
+                res = future.result()
+            except Exception as e:
+                print(f"[SERVER] <--- [500] Search execution failed: {e}\n", flush=True)
+                self._send_json(500, {"error": f"Search execution failed: {str(e)}"})
+                return
+
+            print(
+                f"[SERVER] <--- Finished GET /search | status='{res.status}' results={len(res.results)} "
+                f"pages={res.pages_scraped}/{pages} attempts={res.attempts} latency={res.latency_ms}ms\n",
+                flush=True,
+            )
 
             response_data = {
                 "engine": res.engine,
@@ -129,14 +188,32 @@ class ScraperHandler(BaseHTTPRequestHandler):
 
             eng = self._select_engine(engine_name, method)
             if eng is None:
-                self._send_json(400, {"error": f"Unsupported engine '{engine_name}'. Use 'ddg' or 'brave'."})
+                err_msg = f"Unsupported engine '{engine_name}'. Supported: 'ddg', 'brave', 'brave-playwright'."
+                print(f"[SERVER] [400] {err_msg}", flush=True)
+                self._send_json(400, {"error": err_msg})
                 return
 
-            future = asyncio.run_coroutine_threadsafe(
-                eng.search(SearchQuery(query=query, region=region, max_pages=pages)),
-                async_loop,
+            print(
+                f"\n[SERVER] ---> Incoming POST /search | query='{query}' engine='{engine_name}' method='{method}' pages={pages}",
+                flush=True,
             )
-            res = future.result()
+
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    eng.search(SearchQuery(query=query, region=region, max_pages=pages)),
+                    async_loop,
+                )
+                res = future.result()
+            except Exception as e:
+                print(f"[SERVER] <--- [500] Search execution failed: {e}\n", flush=True)
+                self._send_json(500, {"error": f"Search execution failed: {str(e)}"})
+                return
+
+            print(
+                f"[SERVER] <--- Finished POST /search | status='{res.status}' results={len(res.results)} "
+                f"pages={res.pages_scraped}/{pages} attempts={res.attempts} latency={res.latency_ms}ms\n",
+                flush=True,
+            )
 
             response_data = {
                 "engine": res.engine,
@@ -170,16 +247,23 @@ def run(port: int | None = None):
         port = int(os.environ.get("PORT", "8080"))
     server = HTTPServer(("0.0.0.0", port), ScraperHandler)
     print(f"Scraper API Server listening at http://localhost:{port}")
+    print(f"  - HTTP Backend: {'curl-cffi (Chrome 120 TLS fingerprint)' if pool.is_curl_cffi else 'httpx'}")
+    print(f"  - Proxies active: {len(proxies)} ({'Direct mode / no proxies' if not proxies else 'Proxy pool active'})")
     print(f"  - Health check: http://localhost:{port}/health")
     print(f"  - DDG Search (GET): http://localhost:{port}/search?q=python&engine=ddg")
     print(f"  - Brave Search (GET): http://localhost:{port}/search?q=python&engine=brave")
-    print(f"  - Search (POST): http://localhost:{port}/search (JSON body with engine='ddg'|'brave')")
+    print(f"  - Brave Playwright (GET): http://localhost:{port}/search?q=python&engine=brave-playwright")
+    print(f"  - Search (POST): http://localhost:{port}/search (JSON body with engine='ddg'|'brave'|'brave-playwright')")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         server.server_close()
+        try:
+            asyncio.run_coroutine_threadsafe(engine_brave_playwright.aclose(), async_loop).result(timeout=2.0)
+        except Exception:
+            pass
         try:
             asyncio.run_coroutine_threadsafe(pool.aclose(), async_loop).result(timeout=2.0)
         except Exception:
