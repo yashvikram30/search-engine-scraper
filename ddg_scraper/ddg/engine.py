@@ -6,6 +6,7 @@ import re
 import time
 from datetime import datetime, timezone
 from urllib.parse import urlencode
+from ..net import CurlCffiClient, PoolExhaustedError, ProxyPool, TtlCache, backoff
 
 import httpx
 
@@ -51,6 +52,16 @@ def normalize_query(query: str) -> str:
 
 def build_url(query: str, region: str) -> str:
     return f"{ENDPOINT}?{urlencode({'q': query, 'b': '', 'kl': region})}"
+
+def request_headers(page_idx: int, use_curl: bool) -> dict[str, str]:
+    if page_idx == 1:
+        return {} if use_curl else HEADERS
+    nav = {
+        "Referer": ENDPOINT,
+        "Origin": "https://html.duckduckgo.com",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    return nav if use_curl else {**HEADERS, **nav, "Sec-Fetch-Site": "same-origin"}
 
 class DuckDuckGoEngine:
     name = "duckduckgo"
@@ -138,12 +149,20 @@ class DuckDuckGoEngine:
                 )
 
                 try:
+                    use_curl = isinstance(entry.client, CurlCffiClient)
+                    nav = {
+                        "Referer": ENDPOINT,
+                        "Origin": "https://html.duckduckgo.com",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    }
                     if req_method == "POST":
+                        headers = nav if use_curl else {**HEADERS, **nav, "Sec-Fetch-Site": "same-origin"}
                         res = await entry.client.post(
-                            ENDPOINT, data=current_payload, headers=HEADERS, timeout=TIMEOUT
+                            ENDPOINT, data=current_payload, headers=headers, timeout=TIMEOUT
                         )
                     else:
-                        res = await entry.client.get(target_url, headers=HEADERS, timeout=TIMEOUT)
+                        headers = {} if use_curl else HEADERS
+                        res = await entry.client.get(target_url, headers=headers, timeout=TIMEOUT)
                     html = res.text
                     page_results = parse_results(html)
                     page_status, reason = explain_ddg_response(res.status_code, html, len(page_results))

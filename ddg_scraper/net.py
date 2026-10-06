@@ -138,7 +138,7 @@ class ProxyPool:
                 try:
                     return CurlCffiClient(
                         proxy=proxy_url,
-                        impersonate="chrome120",
+                        impersonate="chrome",
                         allow_redirects=False,
                     )
                 except Exception as ex:
